@@ -10,6 +10,7 @@ use std::fmt::Write;
 use arroy::distances::*;
 use arroy::ItemId;
 use arroy_bench::measure_arroy_distance;
+pub use arroy_bench::prepare_and_run;
 pub use dataset::*;
 use qdrant_client::qdrant::quantization_config;
 
@@ -75,7 +76,7 @@ pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
 }
 
 /// A generalist distance trait that contains the informations required to configure every engine
-trait Distance {
+pub trait Distance {
     const BINARY_QUANTIZED: bool;
     const QDRANT_DISTANCE: qdrant_client::qdrant::Distance;
     type ArroyDistance: arroy::Distance;
@@ -157,7 +158,7 @@ fn partial_sort_by<'a, D: crate::Distance>(
     ret
 }
 
-fn distance<D: crate::Distance>(left: &[f32], right: &[f32]) -> f32 {
+pub fn distance<D: crate::Distance>(left: &[f32], right: &[f32]) -> f32 {
     D::real_distance(left, right)
 }
 
