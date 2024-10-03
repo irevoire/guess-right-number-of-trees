@@ -1,8 +1,9 @@
 #![allow(clippy::type_complexity)]
 
-mod arroy_bench;
+pub mod arroy_bench;
 mod dataset;
-mod qdrant;
+mod qdrant_bench;
+pub mod scenarios;
 
 use std::fmt;
 use std::fmt::Write;
@@ -10,11 +11,10 @@ use std::fmt::Write;
 use arroy::distances::*;
 use arroy::ItemId;
 use arroy_bench::measure_arroy_distance;
-pub use arroy_bench::prepare_and_run;
 pub use dataset::*;
 use qdrant_client::qdrant::quantization_config;
 
-use crate::qdrant::measure_qdrant_distance;
+use crate::qdrant_bench::measure_qdrant_distance;
 
 pub const RECALL_TESTED: [usize; 6] = [1, 10, 20, 50, 100, 500];
 pub const RNG_SEED: u64 = 38;
@@ -24,7 +24,7 @@ pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
     let mut recall_tested = String::new();
     RECALL_TESTED.iter().for_each(|recall| write!(&mut recall_tested, "{recall:4}, ").unwrap());
     let recall_tested = recall_tested.trim_end_matches(", ");
-    println!("Recall tested is:                   [{recall_tested}]");
+    println!("Recall tested is:             [{recall_tested}]");
 
     for func in &[
         // arroy
