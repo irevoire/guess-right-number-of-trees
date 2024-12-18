@@ -58,7 +58,7 @@ impl<T: AnyBitPattern> MatLEView<T> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &[T]> {
-        (0..self.len() - 1).map(|i| self.get(i).unwrap().unwrap())
+        (0..self.len()).map(|i| self.get(i).unwrap().unwrap())
     }
 
     pub fn get_all(&self) -> Vec<&[T]> {
