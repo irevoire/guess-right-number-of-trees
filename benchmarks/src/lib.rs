@@ -86,9 +86,9 @@ trait Distance {
 }
 
 macro_rules! arroy_distance {
-    ($distance:ty => real: $real:ident, qdrant: $qdrant:ident) => {
+    ($distance:ty => real: $real:ident, qdrant: $qdrant:ident, bq: $bq:expr) => {
         impl Distance for $distance {
-            const BINARY_QUANTIZED: bool = true;
+            const BINARY_QUANTIZED: bool = $bq;
             const QDRANT_DISTANCE: qdrant_client::qdrant::Distance =
                 qdrant_client::qdrant::Distance::$qdrant;
             type ArroyDistance = $distance;
@@ -108,12 +108,12 @@ macro_rules! arroy_distance {
     };
 }
 
-arroy_distance!(BinaryQuantizedAngular => real: cosine, qdrant: Cosine);
-arroy_distance!(Angular =>  real: cosine, qdrant: Cosine);
-arroy_distance!(BinaryQuantizedEuclidean => real: euclidean, qdrant: Euclid);
-arroy_distance!(Euclidean => real: euclidean, qdrant: Euclid);
-arroy_distance!(BinaryQuantizedManhattan => real: manhattan, qdrant: Manhattan);
-arroy_distance!(Manhattan => real: manhattan, qdrant: Manhattan);
+arroy_distance!(BinaryQuantizedAngular => real: cosine, qdrant: Cosine, bq: true);
+arroy_distance!(Angular =>  real: cosine, qdrant: Cosine, bq: false);
+arroy_distance!(BinaryQuantizedEuclidean => real: euclidean, qdrant: Euclid, bq: true);
+arroy_distance!(Euclidean => real: euclidean, qdrant: Euclid, bq: false);
+arroy_distance!(BinaryQuantizedManhattan => real: manhattan, qdrant: Manhattan, bq: true);
+arroy_distance!(Manhattan => real: manhattan, qdrant: Manhattan, bq: false);
 // arroy_distance!(DotProduct => real: dot, qdrant: Dot);
 
 fn bench_arroy_distance<
