@@ -93,7 +93,7 @@ pub fn measure_qdrant_distance<
             for _ in 0..100 {
                 let querying = points.choose(&mut rng).unwrap();
 
-                let relevant = partial_sort_by::<D::RealDistance>(
+                let relevant = partial_sort_by::<D>(
                     points
                         .iter()
                         .filter(|point| {

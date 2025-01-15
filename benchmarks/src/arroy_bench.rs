@@ -15,8 +15,7 @@ use crate::{partial_sort_by, Recall, RECALL_TESTED, RNG_SEED};
 const TWENTY_HUNDRED_MIB: usize = 2000 * 1024 * 1024 * 1024;
 
 pub fn measure_arroy_distance<
-    ArroyDistance: arroy::Distance,
-    PerfectDistance: arroy::Distance,
+    D: crate::Distance,
     const OVERSAMPLING: usize,
     const FILTER_SUBSET_PERCENT: usize,
 >(
@@ -33,7 +32,7 @@ pub fn measure_arroy_distance<
     let mut wtxn = env.write_txn().unwrap();
 
     let database = env
-        .create_database::<internals::KeyCodec, NodeCodec<ArroyDistance>>(&mut wtxn, None)
+        .create_database::<internals::KeyCodec, NodeCodec<D::ArroyDistance>>(&mut wtxn, None)
         .unwrap();
     let inserted = load_into_arroy(&mut arroy_seed, &mut wtxn, database, dimensions, points);
     wtxn.commit().unwrap();
@@ -65,7 +64,7 @@ pub fn measure_arroy_distance<
                 let rtxn = env.read_txn().unwrap();
                 let reader = arroy::Reader::open(&rtxn, 0, database).unwrap();
 
-                let relevant = partial_sort_by::<PerfectDistance>(
+                let relevant = partial_sort_by::<D>(
                     points
                         .iter()
                         // Only evaluate the candidate points
@@ -121,7 +120,7 @@ pub fn measure_arroy_distance<
     let time_to_search = total_duration;
 
     // make the distance name smaller
-    let distance_name = ArroyDistance::name().replace("binary quantized", "bq");
+    let distance_name = D::name().replace("binary quantized", "bq");
     println!(
         "[arroy]  {distance_name:16} x{OVERSAMPLING}: {recalls:?}, \
         indexed for: {time_to_index:02.2?}, \

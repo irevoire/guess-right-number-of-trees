@@ -8,11 +8,10 @@ use std::fmt;
 use std::fmt::Write;
 
 use arroy::distances::*;
-use arroy::internals::{Leaf, UnalignedVector};
 use arroy::ItemId;
 use arroy_bench::measure_arroy_distance;
 pub use dataset::*;
-use qdrant_client::qdrant::{quantization_config, ScalarQuantizationBuilder};
+use qdrant_client::qdrant::quantization_config;
 
 use crate::qdrant::measure_qdrant_distance;
 
@@ -76,52 +75,53 @@ pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
 }
 
 /// A generalist distance trait that contains the informations required to configure every engine
-trait Distance: arroy::Distance {
+trait Distance {
     const BINARY_QUANTIZED: bool;
-    type RealDistance: arroy::Distance;
     const QDRANT_DISTANCE: qdrant_client::qdrant::Distance;
+    type ArroyDistance: arroy::Distance;
+
+    fn name() -> &'static str;
     fn qdrant_quantization_config() -> quantization_config::Quantization;
+    fn real_distance(a: &[f32], b: &[f32]) -> f32;
 }
 
 macro_rules! arroy_distance {
-    ($distance:ty => qdrant: $qdrant:ident) => {
-        impl Distance for $distance {
-            const BINARY_QUANTIZED: bool = false;
-            type RealDistance = $distance;
-            const QDRANT_DISTANCE: qdrant_client::qdrant::Distance =
-                qdrant_client::qdrant::Distance::$qdrant;
-            fn qdrant_quantization_config() -> quantization_config::Quantization {
-                ScalarQuantizationBuilder::default().into()
-            }
-        }
-    };
-    ($distance:ty => real: $real:ty, qdrant: $qdrant:ident) => {
+    ($distance:ty => real: $real:ident, qdrant: $qdrant:ident) => {
         impl Distance for $distance {
             const BINARY_QUANTIZED: bool = true;
-            type RealDistance = $real;
             const QDRANT_DISTANCE: qdrant_client::qdrant::Distance =
                 qdrant_client::qdrant::Distance::$qdrant;
+            type ArroyDistance = $distance;
+
+            fn name() -> &'static str {
+                stringify!($distance)
+            }
             fn qdrant_quantization_config() -> quantization_config::Quantization {
                 qdrant_client::qdrant::BinaryQuantization::default().into()
+            }
+            fn real_distance(a: &[f32], b: &[f32]) -> f32 {
+                let a = ndarray::aview1(a);
+                let b = ndarray::aview1(b);
+                fast_distances::$real(&a, &b)
             }
         }
     };
 }
 
-arroy_distance!(BinaryQuantizedAngular => real: Angular, qdrant: Cosine);
-arroy_distance!(Angular => qdrant: Cosine);
-arroy_distance!(BinaryQuantizedEuclidean => real: Euclidean, qdrant: Euclid);
-arroy_distance!(Euclidean => qdrant: Euclid);
-arroy_distance!(BinaryQuantizedManhattan => real: Manhattan, qdrant: Manhattan);
-arroy_distance!(Manhattan => qdrant: Manhattan);
-arroy_distance!(DotProduct => qdrant: Dot);
+arroy_distance!(BinaryQuantizedAngular => real: cosine, qdrant: Cosine);
+arroy_distance!(Angular =>  real: cosine, qdrant: Cosine);
+arroy_distance!(BinaryQuantizedEuclidean => real: euclidean, qdrant: Euclid);
+arroy_distance!(Euclidean => real: euclidean, qdrant: Euclid);
+arroy_distance!(BinaryQuantizedManhattan => real: manhattan, qdrant: Manhattan);
+arroy_distance!(Manhattan => real: manhattan, qdrant: Manhattan);
+// arroy_distance!(DotProduct => real: dot, qdrant: Dot);
 
 fn bench_arroy_distance<
     D: Distance,
     const OVERSAMPLING: usize,
     const FILTER_SUBSET_PERCENT: usize,
 >() -> fn(usize, &[(u32, &[f32])]) {
-    measure_arroy_distance::<D, D::RealDistance, OVERSAMPLING, FILTER_SUBSET_PERCENT>
+    measure_arroy_distance::<D, OVERSAMPLING, FILTER_SUBSET_PERCENT>
 }
 
 fn bench_qdrant_distance<D: Distance, const EXACT: bool, const FILTER_SUBSET_PERCENT: usize>(
@@ -129,7 +129,7 @@ fn bench_qdrant_distance<D: Distance, const EXACT: bool, const FILTER_SUBSET_PER
     measure_qdrant_distance::<D, EXACT, FILTER_SUBSET_PERCENT>
 }
 
-fn partial_sort_by<'a, D: arroy::Distance>(
+fn partial_sort_by<'a, D: crate::Distance>(
     mut vectors: impl Iterator<Item = (ItemId, &'a [f32])>,
     sort_by: &[f32],
     elements: usize,
@@ -157,13 +157,8 @@ fn partial_sort_by<'a, D: arroy::Distance>(
     ret
 }
 
-fn distance<D: arroy::Distance>(left: &[f32], right: &[f32]) -> f32 {
-    let left = UnalignedVector::from_slice(left);
-    let left = Leaf { header: D::new_header(&left), vector: left };
-    let right = UnalignedVector::from_slice(right);
-    let right = Leaf { header: D::new_header(&right), vector: right };
-
-    D::built_distance(&left, &right)
+fn distance<D: crate::Distance>(left: &[f32], right: &[f32]) -> f32 {
+    D::real_distance(left, right)
 }
 
 pub struct Recall(pub f32);
