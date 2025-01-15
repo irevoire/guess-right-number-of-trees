@@ -23,7 +23,7 @@ pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
     let mut recall_tested = String::new();
     RECALL_TESTED.iter().for_each(|recall| write!(&mut recall_tested, "{recall:4}, ").unwrap());
     let recall_tested = recall_tested.trim_end_matches(", ");
-    println!("Recall tested is:             [{recall_tested}]");
+    println!("Recall tested is:                   [{recall_tested}]");
 
     for func in &[
         // arroy

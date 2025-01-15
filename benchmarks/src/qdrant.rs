@@ -167,7 +167,7 @@ pub fn measure_qdrant_distance<
             distance_name.push_str(" exact");
         }
         println!(
-            "[qdrant] {distance_name:16} x1: {recalls:?}, \
+            "[qdrant] {distance_name:22} x1: {recalls:?}, \
             indexed for: {time_to_index:02.2?}, \
             searched for: {time_to_search:02.2?}, \
             size on disk: {database_size:#.2}, \

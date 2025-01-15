@@ -120,9 +120,9 @@ pub fn measure_arroy_distance<
     let time_to_search = total_duration;
 
     // make the distance name smaller
-    let distance_name = D::name().replace("binary quantized", "bq");
+    let distance_name = D::name();
     println!(
-        "[arroy]  {distance_name:16} x{OVERSAMPLING}: {recalls:?}, \
+        "[arroy]  {distance_name:22} x{OVERSAMPLING}: {recalls:?}, \
         indexed for: {time_to_index:02.2?}, \
         searched for: {time_to_search:02.2?}, \
         size on disk: {database_size:#.2}, \
