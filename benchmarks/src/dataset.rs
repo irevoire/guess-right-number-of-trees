@@ -18,6 +18,7 @@ impl<T: AnyBitPattern> MatLEView<T> {
         let file = File::open(path).with_context(|| format!("while opening {path}")).unwrap();
         let mmap = unsafe { Mmap::map(&file).unwrap() };
 
+        assert!(mmap.len() == 0, "The file seems to be missing");
         assert!((mmap.len() / mem::size_of::<T>()) % dimensions == 0);
         MatLEView { name, mmap, dimensions, _marker: PhantomData }
     }
