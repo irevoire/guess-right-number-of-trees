@@ -5,14 +5,14 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-arroy = { git = "https://github.com/meilisearch/arroy", rev = "2386594" }
+arroy = { git = "https://github.com/meilisearch/arroy", rev = "65f64138f0ad5cc53ec2126955f1c15dfa14a86a" }
 byte-unit = "5.1.4"
 bytemuck = "1.16.1"
 clap = { version = "4.5.18", features = ["derive"] }
 enum-iterator = "2.1.0"
 fast-distances = "0.0.1"
 futures-util = "0.3.30"
-heed = "0.20.3"
+heed = "0.21.0"
 memmap2 = "0.9.4"
 ndarray = "0.16.1"
 qdrant-client = "1.11.2"

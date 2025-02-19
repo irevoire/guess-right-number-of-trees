@@ -77,15 +77,13 @@ pub fn measure_arroy_distance<
                 );
 
                 let now = std::time::Instant::now();
-                let arroy = reader
-                    .nns_by_item(
-                        &rtxn,
-                        querying.0,
-                        number_fetched,
-                        None,
-                        Some(NonZeroUsize::new(OVERSAMPLING).unwrap()),
-                        candidates.as_ref(),
-                    )
+                let mut arroy = reader.nns(number_fetched);
+                if let Some(ref candidates) = candidates {
+                    arroy.candidates(candidates);
+                }
+                let arroy = arroy
+                    .oversampling(NonZeroUsize::new(OVERSAMPLING).unwrap())
+                    .by_item(&rtxn, querying.0)
                     .unwrap()
                     .unwrap();
                 let elapsed = now.elapsed();
@@ -144,6 +142,6 @@ fn load_into_arroy<D: arroy::Distance>(
         writer.add_item(wtxn, *i, vector).unwrap();
         assert!(candidates.push(*i));
     }
-    writer.build(wtxn, rng, None).unwrap();
+    writer.builder(rng).available_memory(1024 * 1024 * 1024).build(wtxn).unwrap();
     candidates
 }
