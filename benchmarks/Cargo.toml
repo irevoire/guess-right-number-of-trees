@@ -5,11 +5,13 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-arroy = { git = "https://github.com/meilisearch/arroy", rev = "65f64138f0ad5cc53ec2126955f1c15dfa14a86a" }
+arroy = { git = "https://github.com/meilisearch/arroy", rev = "56b114c" }
+# arroy = { path = "../../arroy" }
 byte-unit = "5.1.4"
 bytemuck = "1.16.1"
 clap = { version = "4.5.18", features = ["derive"] }
 enum-iterator = "2.1.0"
+env_logger = "0.11.6"
 fast-distances = "0.0.1"
 futures-util = "0.3.30"
 heed = "0.21.0"

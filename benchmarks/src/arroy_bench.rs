@@ -142,6 +142,7 @@ fn load_into_arroy<D: arroy::Distance>(
         writer.add_item(wtxn, *i, vector).unwrap();
         assert!(candidates.push(*i));
     }
-    writer.builder(rng).available_memory(1024 * 1024 * 1024).build(wtxn).unwrap();
+    // 500MiB
+    writer.builder(rng).available_memory(1024 * 1024 * 1024 / 2).build(wtxn).unwrap();
     candidates
 }

@@ -55,6 +55,9 @@ struct Args {
 }
 
 fn main() {
+    use env_logger::Env;
+    env_logger::Builder::from_env(Env::default().default_filter_or("trace")).init();
+
     let Args { datasets, count } = Args::parse();
 
     let datasets: Vec<MatLEView<_>> = if datasets.is_empty() {
