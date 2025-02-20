@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 
-use arroy::distances::Angular;
 use arroy::internals::{self, NodeCodec};
 use arroy::{Database, Distance, ItemId, Writer};
 use byte_unit::{Byte, UnitType};
