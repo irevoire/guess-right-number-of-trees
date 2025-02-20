@@ -1,8 +1,9 @@
 #![allow(clippy::type_complexity)]
 
-mod arroy_bench;
+pub mod arroy_bench;
 mod dataset;
-mod qdrant;
+mod qdrant_bench;
+pub mod scenarios;
 
 use std::fmt;
 use std::fmt::Write;
@@ -13,7 +14,7 @@ use arroy_bench::measure_arroy_distance;
 pub use dataset::*;
 use qdrant_client::qdrant::quantization_config;
 
-use crate::qdrant::measure_qdrant_distance;
+use crate::qdrant_bench::measure_qdrant_distance;
 
 pub const RECALL_TESTED: [usize; 6] = [1, 10, 20, 50, 100, 500];
 pub const RNG_SEED: u64 = 38;
@@ -23,32 +24,32 @@ pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
     let mut recall_tested = String::new();
     RECALL_TESTED.iter().for_each(|recall| write!(&mut recall_tested, "{recall:4}, ").unwrap());
     let recall_tested = recall_tested.trim_end_matches(", ");
-    println!("Recall tested is:                   [{recall_tested}]");
+    println!("Recall tested is:             [{recall_tested}]");
 
     for func in &[
         // arroy
-        bench_arroy_distance::<Angular, 1, 100>(),
-        bench_arroy_distance::<BinaryQuantizedAngular, 1, 100>(),
-        bench_arroy_distance::<BinaryQuantizedAngular, 3, 100>(),
-        bench_arroy_distance::<Angular, 1, 50>(),
-        bench_arroy_distance::<BinaryQuantizedAngular, 1, 50>(),
-        bench_arroy_distance::<BinaryQuantizedAngular, 3, 50>(),
-        bench_arroy_distance::<Angular, 1, 2>(),
-        bench_arroy_distance::<BinaryQuantizedAngular, 1, 2>(),
-        bench_arroy_distance::<BinaryQuantizedAngular, 3, 2>(),
+        bench_arroy_distance::<Cosine, 1, 100>(),
+        bench_arroy_distance::<BinaryQuantizedCosine, 1, 100>(),
+        bench_arroy_distance::<BinaryQuantizedCosine, 3, 100>(),
+        bench_arroy_distance::<Cosine, 1, 50>(),
+        bench_arroy_distance::<BinaryQuantizedCosine, 1, 50>(),
+        bench_arroy_distance::<BinaryQuantizedCosine, 3, 50>(),
+        bench_arroy_distance::<Cosine, 1, 2>(),
+        bench_arroy_distance::<BinaryQuantizedCosine, 1, 2>(),
+        bench_arroy_distance::<BinaryQuantizedCosine, 3, 2>(),
         // qdrant
-        bench_qdrant_distance::<Angular, false, 100>(),
-        bench_qdrant_distance::<Angular, true, 100>(),
-        bench_qdrant_distance::<BinaryQuantizedAngular, false, 100>(),
-        bench_qdrant_distance::<BinaryQuantizedAngular, true, 100>(),
-        bench_qdrant_distance::<Angular, false, 50>(),
-        bench_qdrant_distance::<Angular, true, 50>(),
-        bench_qdrant_distance::<BinaryQuantizedAngular, false, 50>(),
-        bench_qdrant_distance::<BinaryQuantizedAngular, true, 50>(),
-        bench_qdrant_distance::<Angular, false, 2>(),
-        bench_qdrant_distance::<Angular, true, 2>(),
-        bench_qdrant_distance::<BinaryQuantizedAngular, false, 2>(),
-        bench_qdrant_distance::<BinaryQuantizedAngular, true, 2>(),
+        bench_qdrant_distance::<Cosine, false, 100>(),
+        bench_qdrant_distance::<Cosine, true, 100>(),
+        bench_qdrant_distance::<BinaryQuantizedCosine, false, 100>(),
+        bench_qdrant_distance::<BinaryQuantizedCosine, true, 100>(),
+        bench_qdrant_distance::<Cosine, false, 50>(),
+        bench_qdrant_distance::<Cosine, true, 50>(),
+        bench_qdrant_distance::<BinaryQuantizedCosine, false, 50>(),
+        bench_qdrant_distance::<BinaryQuantizedCosine, true, 50>(),
+        bench_qdrant_distance::<Cosine, false, 2>(),
+        bench_qdrant_distance::<Cosine, true, 2>(),
+        bench_qdrant_distance::<BinaryQuantizedCosine, false, 2>(),
+        bench_qdrant_distance::<BinaryQuantizedCosine, true, 2>(),
         // bench_arroy_distance::<Angular, 1>(),
         // bench_qdrant_distance::<BinaryQuantizedAngular, false>(),
         // bench_qdrant_distance::<BinaryQuantizedAngular, true>(),
@@ -75,7 +76,7 @@ pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
 }
 
 /// A generalist distance trait that contains the informations required to configure every engine
-trait Distance {
+pub trait Distance {
     const BINARY_QUANTIZED: bool;
     const QDRANT_DISTANCE: qdrant_client::qdrant::Distance;
     type ArroyDistance: arroy::Distance;
@@ -108,8 +109,8 @@ macro_rules! arroy_distance {
     };
 }
 
-arroy_distance!(BinaryQuantizedAngular => real: cosine, qdrant: Cosine, bq: true);
-arroy_distance!(Angular =>  real: cosine, qdrant: Cosine, bq: false);
+arroy_distance!(BinaryQuantizedCosine => real: cosine, qdrant: Cosine, bq: true);
+arroy_distance!(Cosine =>  real: cosine, qdrant: Cosine, bq: false);
 arroy_distance!(BinaryQuantizedEuclidean => real: euclidean, qdrant: Euclid, bq: true);
 arroy_distance!(Euclidean => real: euclidean, qdrant: Euclid, bq: false);
 arroy_distance!(BinaryQuantizedManhattan => real: manhattan, qdrant: Manhattan, bq: true);
@@ -157,7 +158,7 @@ fn partial_sort_by<'a, D: crate::Distance>(
     ret
 }
 
-fn distance<D: crate::Distance>(left: &[f32], right: &[f32]) -> f32 {
+pub fn distance<D: crate::Distance>(left: &[f32], right: &[f32]) -> f32 {
     D::real_distance(left, right)
 }
 
