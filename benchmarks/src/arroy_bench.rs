@@ -16,7 +16,7 @@ use crate::scenarios::*;
 use crate::{partial_sort_by, Recall, RECALL_TESTED, RNG_SEED};
 const TWENTY_HUNDRED_MIB: usize = 2000 * 1024 * 1024 * 1024;
 
-pub fn prepare_and_run<D, F>(points: &[(u32, &[f32])], execute: F)
+pub fn prepare_and_run<D, F>(points: &[(u32, &[f32])], memory: usize, execute: F)
 where
     D: Distance,
     F: FnOnce(Duration, &heed::Env, Database<D>),
@@ -33,7 +33,8 @@ where
 
     let database =
         env.create_database::<internals::KeyCodec, NodeCodec<D>>(&mut wtxn, None).unwrap();
-    let _inserted = load_into_arroy(&mut arroy_seed, &mut wtxn, database, dimensions, points);
+    let _inserted =
+        load_into_arroy(&mut arroy_seed, &mut wtxn, database, dimensions, memory, points);
     wtxn.commit().unwrap();
 
     (execute)(before_build.elapsed(), &env, database);
@@ -122,6 +123,7 @@ pub fn measure_arroy_distance<
     const FILTER_SUBSET_PERCENT: usize,
 >(
     dimensions: usize,
+    memory: usize,
     points: &[(u32, &[f32])],
 ) {
     let dir = tempfile::tempdir().unwrap();
@@ -136,7 +138,8 @@ pub fn measure_arroy_distance<
     let database = env
         .create_database::<internals::KeyCodec, NodeCodec<D::ArroyDistance>>(&mut wtxn, None)
         .unwrap();
-    let inserted = load_into_arroy(&mut arroy_seed, &mut wtxn, database, dimensions, points);
+    let inserted =
+        load_into_arroy(&mut arroy_seed, &mut wtxn, database, dimensions, memory, points);
     wtxn.commit().unwrap();
 
     let filtered_percentage = FILTER_SUBSET_PERCENT as f32;
@@ -232,6 +235,7 @@ fn load_into_arroy<D: arroy::Distance>(
     wtxn: &mut RwTxn,
     database: Database<D>,
     dimensions: usize,
+    memory: usize,
     points: &[(ItemId, &[f32])],
 ) -> RoaringBitmap {
     let writer = Writer::<D>::new(database, 0, dimensions);
@@ -241,6 +245,6 @@ fn load_into_arroy<D: arroy::Distance>(
         writer.add_item(wtxn, *i, vector).unwrap();
         assert!(candidates.push(*i));
     }
-    writer.builder(rng).build(wtxn).unwrap();
+    writer.builder(rng).available_memory(memory).build(wtxn).unwrap();
     candidates
 }

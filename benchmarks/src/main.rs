@@ -4,6 +4,7 @@ use std::fmt::Write as _;
 use arroy::distances::Cosine;
 use benchmarks::scenarios::ScenarioSearch;
 use benchmarks::{arroy_bench, scenarios, MatLEView, RECALL_TESTED, RNG_SEED};
+use byte_unit::Byte;
 use clap::Parser;
 use enum_iterator::Sequence;
 use itertools::{iproduct, Itertools};
@@ -37,10 +38,15 @@ struct Args {
     /// Number of vectors to evaluate from the datasets.
     #[arg(long, default_value_t = 10_000)]
     count: usize,
+
+    /// Memory available for indexing.
+    #[arg(long, default_value_t = Byte::MAX)]
+    memory: Byte,
 }
 
 fn main() {
-    let Args { datasets, count, contenders, distances, over_samplings, filterings } = Args::parse();
+    let Args { datasets, count, contenders, distances, over_samplings, filterings, memory } =
+        Args::parse();
 
     let datasets = set_or_all::<_, MatLEView<f32>>(datasets);
     let contenders = set_or_all::<_, scenarios::ScenarioContender>(contenders);
@@ -66,12 +72,13 @@ fn main() {
             previous_dataset = Some(dataset.name());
             dataset.header();
             if dataset.len() != count {
-                println!("\x1b[1m{count}\x1b[0m vectors are used for this measure");
+                println!("\x1b[1m{count}\x1b[0m vectors are used for this measure and {}", memory);
             }
         }
 
         let points: Vec<_> =
             dataset.iter().take(count).enumerate().map(|(i, v)| (i as u32, v)).collect();
+        let memory = memory.as_u64() as usize;
 
         let mut recall_tested = String::new();
         RECALL_TESTED.iter().for_each(|recall| write!(&mut recall_tested, "{recall:4}, ").unwrap());
@@ -127,6 +134,7 @@ fn main() {
             scenarios::ScenarioContender::Qdrant => match distance {
                 scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
                     &points,
+                    memory,
                     |time_to_index, env, database| {
                         arroy_bench::run_scenarios(
                             env,
@@ -142,6 +150,7 @@ fn main() {
             scenarios::ScenarioContender::Arroy => match distance {
                 scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
                     &points,
+                    memory,
                     |time_to_index, env, database| {
                         arroy_bench::run_scenarios(
                             env,

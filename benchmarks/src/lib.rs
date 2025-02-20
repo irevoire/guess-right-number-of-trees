@@ -19,7 +19,7 @@ use crate::qdrant_bench::measure_qdrant_distance;
 pub const RECALL_TESTED: [usize; 6] = [1, 10, 20, 50, 100, 500];
 pub const RNG_SEED: u64 = 38;
 
-pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
+pub fn bench_over_all_distances(dimensions: usize, memory: usize, vectors: &[(u32, &[f32])]) {
     println!("\x1b[1m{}\x1b[0m vectors are used for this measure", vectors.len());
     let mut recall_tested = String::new();
     RECALL_TESTED.iter().for_each(|recall| write!(&mut recall_tested, "{recall:4}, ").unwrap());
@@ -71,7 +71,7 @@ pub fn bench_over_all_distances(dimensions: usize, vectors: &[(u32, &[f32])]) {
         // bench_qdrant_distance::<DotProduct, false>(),
         // bench_arroy_distance::<DotProduct, 1>(),
     ] {
-        (func)(dimensions, vectors);
+        (func)(dimensions, memory, vectors);
     }
 }
 
@@ -121,12 +121,12 @@ fn bench_arroy_distance<
     D: Distance,
     const OVERSAMPLING: usize,
     const FILTER_SUBSET_PERCENT: usize,
->() -> fn(usize, &[(u32, &[f32])]) {
+>() -> fn(usize, usize, &[(u32, &[f32])]) {
     measure_arroy_distance::<D, OVERSAMPLING, FILTER_SUBSET_PERCENT>
 }
 
 fn bench_qdrant_distance<D: Distance, const EXACT: bool, const FILTER_SUBSET_PERCENT: usize>(
-) -> fn(usize, &[(u32, &[f32])]) {
+) -> fn(usize, usize, &[(u32, &[f32])]) {
     measure_qdrant_distance::<D, EXACT, FILTER_SUBSET_PERCENT>
 }
 

@@ -167,6 +167,7 @@ pub fn measure_qdrant_distance<
     const FILTER_SUBSET_PERCENT: usize,
 >(
     dimensions: usize,
+    _memory: usize,
     points: &[(u32, &[f32])],
 ) {
     let filtered_percentage = FILTER_SUBSET_PERCENT as f32;
