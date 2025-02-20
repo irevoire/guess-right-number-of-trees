@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
-use arroy::distances::Angular;
+use arroy::distances::Cosine;
 use benchmarks::scenarios::ScenarioSearch;
 use benchmarks::{arroy_bench, scenarios, MatLEView, RECALL_TESTED, RNG_SEED};
 use clap::Parser;
@@ -85,7 +85,7 @@ fn main() {
             .map(|(id, target)| {
                 let mut points = points.clone();
                 points.par_sort_unstable_by_key(|(_, v)| {
-                    OrderedFloat(benchmarks::distance::<Angular>(target, v))
+                    OrderedFloat(benchmarks::distance::<Cosine>(target, v))
                 });
 
                 // We collect the different filtered versions here.
@@ -125,7 +125,7 @@ fn main() {
 
         match contender {
             scenarios::ScenarioContender::Qdrant => match distance {
-                scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Angular, _>(
+                scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
                     &points,
                     |time_to_index, env, database| {
                         arroy_bench::run_scenarios(
@@ -140,7 +140,7 @@ fn main() {
                 ),
             },
             scenarios::ScenarioContender::Arroy => match distance {
-                scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Angular, _>(
+                scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
                     &points,
                     |time_to_index, env, database| {
                         arroy_bench::run_scenarios(

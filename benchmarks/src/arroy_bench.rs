@@ -67,17 +67,14 @@ pub fn run_scenarios<D: Distance>(
                     let relevants = relevants.get(..number_fetched).unwrap_or(relevants);
 
                     let now = std::time::Instant::now();
-                    let arroy_answer = reader
-                        .nns_by_item(
-                            &rtxn,
-                            id,
-                            number_fetched,
-                            None,
-                            oversampling.to_non_zero_usize(),
-                            candidates.as_ref(),
-                        )
-                        .unwrap()
-                        .unwrap();
+                    let mut nns = reader.nns(number_fetched);
+                    if let Some(oversampling) = oversampling.to_non_zero_usize() {
+                        nns.oversampling(oversampling);
+                    }
+                    if let Some(candidates) = candidates.as_ref() {
+                        nns.candidates(candidates);
+                    }
+                    let arroy_answer = nns.by_item(&rtxn, id).unwrap().unwrap();
                     let elapsed = now.elapsed();
 
                     let mut correctly_retrieved = Some(0);
@@ -182,17 +179,12 @@ pub fn measure_arroy_distance<
                 );
 
                 let now = std::time::Instant::now();
-                let arroy = reader
-                    .nns_by_item(
-                        &rtxn,
-                        querying.0,
-                        number_fetched,
-                        None,
-                        Some(NonZeroUsize::new(OVERSAMPLING).unwrap()),
-                        candidates.as_ref(),
-                    )
-                    .unwrap()
-                    .unwrap();
+                let mut nns = reader.nns(number_fetched);
+                nns.oversampling(NonZeroUsize::new(OVERSAMPLING).unwrap());
+                if let Some(ref candidates) = candidates {
+                    nns.candidates(candidates);
+                }
+                let arroy = nns.by_item(&rtxn, querying.0).unwrap().unwrap();
                 let elapsed = now.elapsed();
 
                 let mut correctly_retrieved = Some(0);
@@ -249,6 +241,6 @@ fn load_into_arroy<D: arroy::Distance>(
         writer.add_item(wtxn, *i, vector).unwrap();
         assert!(candidates.push(*i));
     }
-    writer.build(wtxn, rng, None).unwrap();
+    writer.builder(rng).build(wtxn).unwrap();
     candidates
 }
