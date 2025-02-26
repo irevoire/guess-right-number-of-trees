@@ -93,6 +93,12 @@ impl<T> Ord for MatLEView<T> {
     }
 }
 
+pub const DATACOMP_SMALL: &str = "assets/datacomp-small.mat";
+pub const DATACOMP_SMALL_DIMENSIONS: usize = 768;
+pub fn datacomp_small() -> MatLEView<f32> {
+    MatLEView::new("Hackernews top posts", DATACOMP_SMALL, DATACOMP_SMALL_DIMENSIONS)
+}
+
 pub const HN_TOP_POSTS_PATH: &str = "assets/hn-top-posts.mat";
 pub const HN_TOP_POSTS_DIMENSIONS: usize = 1024;
 pub fn hn_top_posts() -> MatLEView<f32> {

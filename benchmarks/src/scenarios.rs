@@ -10,6 +10,8 @@ use crate::MatLEView;
 pub enum Dataset {
     /// Hackernews posts (512)
     HnPosts,
+    /// Datacomp small(768)
+    DatacompSmall,
     /// Wikipedia (768)
     Wikipedia,
     /// Hackernews top posts (1024)
@@ -24,6 +26,9 @@ impl From<Dataset> for MatLEView<f32> {
     fn from(dataset: Dataset) -> Self {
         match dataset {
             Dataset::HnPosts => MatLEView::new("Hackernews posts", "assets/hn-posts.mat", 512),
+            Dataset::DatacompSmall => {
+                MatLEView::new("Datacomp small", "assets/datacomp-small.mat", 768)
+            }
             Dataset::Wikipedia => MatLEView::new(
                 "wikipedia 22 12 simple embeddings",
                 "assets/wikipedia-22-12-simple-embeddings.mat",
