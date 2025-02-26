@@ -41,6 +41,17 @@ cargo build --release -p parquet2mat
 max_parallel=10
 
 # Call the function to download parquet files in parallel
+output=assets/datacomp-small.mat
+if [ ! -f $output ]; then
+    cat datacomp-small-with-text-embeddings.urls | xargs -n 1 -P $max_parallel -I {} bash -c 'download_file {}'
+    cargo run --release -p parquet2mat -- \
+        tmp-assets/* \
+        --embedding-name 'clip_l14_text_embedding' \
+        --output $output
+    rm -rf tmp-assets/*
+fi
+
+# Call the function to download parquet files in parallel
 output=assets/db-pedia-OpenAI-text-embedding-ada-002.mat
 if [ ! -f $output ]; then
     cat dbpedia-1536.urls | xargs -n 1 -P $max_parallel -I {} bash -c 'download_file {}'
