@@ -247,6 +247,7 @@ dependencies = [
  "memmap2",
  "nohash",
  "ordered-float 4.6.0",
+ "page_size",
  "rand",
  "rayon",
  "roaring",
