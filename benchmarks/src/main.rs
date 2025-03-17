@@ -95,7 +95,8 @@ fn main() {
             dataset.header();
             if dataset.len() != count {
                 println!(
-                    "\x1b[1m{count}\x1b[0m vectors are used for this measure and {}B of memory",
+                    "\x1b[1m{}\x1b[0m vectors are used for this measure and {}B of memory",
+                    dataset.len(),
                     memory
                 );
             }
