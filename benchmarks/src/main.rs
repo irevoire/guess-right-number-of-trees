@@ -46,6 +46,10 @@ struct Args {
     /// Memory available for indexing.
     #[arg(long, default_value_t = Byte::MAX)]
     memory: Byte,
+
+    /// When set to true, will print all the steps it goes through.
+    #[arg(long, default_value_t = false)]
+    verbose: bool,
 }
 
 fn main() {
@@ -58,6 +62,7 @@ fn main() {
         filterings,
         memory,
         recall_tested,
+        verbose,
     } = Args::parse();
 
     let datasets = set_or_all::<_, MatLEView<f32>>(datasets);
@@ -96,8 +101,7 @@ fn main() {
             if dataset.len() != count {
                 let c = count.min(dataset.len());
                 println!(
-                    "\x1b[1m{c}\x1b[0m vectors are used for this measure and {}B of memory",
-                    dataset.len(),
+                    "\x1b[1m{c}\x1b[0m vectors are used for this measure and {memory}B of memory",
                 );
             }
         }
@@ -169,6 +173,7 @@ fn main() {
                 scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
                     &points,
                     memory,
+                    verbose,
                     |time_to_index, env, database| {
                         arroy_bench::run_scenarios(
                             env,
@@ -186,6 +191,7 @@ fn main() {
                 scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
                     &points,
                     memory,
+                    verbose,
                     |time_to_index, env, database| {
                         arroy_bench::run_scenarios(
                             env,
