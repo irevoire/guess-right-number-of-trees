@@ -162,6 +162,7 @@ fn main() {
                 })
                 .collect()
         };
+        println!("Starting indexing process");
 
         match contender {
             scenarios::ScenarioContender::Qdrant => match distance {
