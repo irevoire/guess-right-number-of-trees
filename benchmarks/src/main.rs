@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 
 use arroy::distances::Cosine;
 use benchmarks::scenarios::ScenarioSearch;
-use benchmarks::{arroy_bench, scenarios, MatLEView, RECALL_TESTED, RNG_SEED};
+use benchmarks::{arroy_bench, scenarios, MatLEView, RNG_SEED};
 use byte_unit::Byte;
 use clap::Parser;
 use enum_iterator::Sequence;
@@ -35,6 +35,10 @@ struct Args {
     #[arg(long, value_enum)]
     filterings: Vec<scenarios::ScenarioFiltering>,
 
+    /// The list of recall to be tested.
+    #[arg(long, default_value_t = String::from("1,10,20,50,100,500"))]
+    recall_tested: String,
+
     /// Number of vectors to evaluate from the datasets.
     #[arg(long, default_value_t = 10_000)]
     count: usize,
@@ -45,14 +49,32 @@ struct Args {
 }
 
 fn main() {
-    let Args { datasets, count, contenders, distances, over_samplings, filterings, memory } =
-        Args::parse();
+    let Args {
+        datasets,
+        count,
+        contenders,
+        distances,
+        over_samplings,
+        filterings,
+        memory,
+        recall_tested,
+    } = Args::parse();
 
     let datasets = set_or_all::<_, MatLEView<f32>>(datasets);
     let contenders = set_or_all::<_, scenarios::ScenarioContender>(contenders);
     let distances = set_or_all::<_, scenarios::ScenarioDistance>(distances);
     let over_samplings = set_or_all::<_, scenarios::ScenarioOversampling>(over_samplings);
     let filterings = set_or_all::<_, scenarios::ScenarioFiltering>(filterings);
+    let recall_tested: Vec<usize> = recall_tested
+        .split(',')
+        .enumerate()
+        .filter(|(_, n)| !n.trim().is_empty())
+        .map(|(i, n)| {
+            n.trim()
+                .parse()
+                .unwrap_or_else(|_| panic!("Could not parse recall value `{n}` at index `{i}`."))
+        })
+        .collect();
 
     let scenaris: Vec<_> = iproduct!(datasets, distances, contenders, over_samplings, filterings)
         .map(|(dataset, distance, contender, oversampling, filtering)| {
@@ -80,55 +102,62 @@ fn main() {
             dataset.iter().take(count).enumerate().map(|(i, v)| (i as u32, v)).collect();
         let memory = memory.as_u64() as usize;
 
-        let mut recall_tested = String::new();
-        RECALL_TESTED.iter().for_each(|recall| write!(&mut recall_tested, "{recall:4}, ").unwrap());
-        let recall_tested = recall_tested.trim_end_matches(", ");
-        println!("Recall tested is:   [{recall_tested}]");
+        let mut recall_tested_s = String::new();
+        recall_tested
+            .iter()
+            .for_each(|recall| write!(&mut recall_tested_s, "{recall:4}, ").unwrap());
+        let recall_tested_s = recall_tested_s.trim_end_matches(", ");
+        println!("Recall tested is:   [{recall_tested_s}]");
 
-        let max = RECALL_TESTED.iter().max().copied().unwrap();
-        let mut rng = StdRng::seed_from_u64(RNG_SEED);
-        let queries: Vec<_> = (0..100)
-            .map(|_| points.choose(&mut rng).unwrap())
-            .map(|(id, target)| {
-                let mut points = points.clone();
-                points.par_sort_unstable_by_key(|(_, v)| {
-                    OrderedFloat(benchmarks::distance::<Cosine>(target, v))
-                });
+        let max = recall_tested.iter().max().copied().unwrap_or_default();
+        // If we have no recall we can skip entirely the generation of the queries
+        let queries = if max == 0 {
+            Vec::new()
+        } else {
+            let mut rng = StdRng::seed_from_u64(RNG_SEED);
+            (0..100)
+                .map(|_| points.choose(&mut rng).unwrap())
+                .map(|(id, target)| {
+                    let mut points = points.clone();
+                    points.par_sort_unstable_by_key(|(_, v)| {
+                        OrderedFloat(benchmarks::distance::<Cosine>(target, v))
+                    });
 
-                // We collect the different filtered versions here.
-                let filtered: HashMap<_, _> = search
-                    .iter()
-                    .map(|ScenarioSearch { filtering, .. }| {
-                        let candidates = match filtering {
-                            scenarios::ScenarioFiltering::NoFilter => None,
-                            filtering => {
-                                let total = points.len() as f32;
-                                let filtering = filtering.to_ratio_f32();
-                                Some(
-                                    points
-                                        .iter()
-                                        .map(|(id, _)| id)
-                                        .take((total * filtering) as usize)
-                                        .collect::<RoaringBitmap>(),
-                                )
-                            }
-                        };
+                    // We collect the different filtered versions here.
+                    let filtered: HashMap<_, _> = search
+                        .iter()
+                        .map(|ScenarioSearch { filtering, .. }| {
+                            let candidates = match filtering {
+                                scenarios::ScenarioFiltering::NoFilter => None,
+                                filtering => {
+                                    let total = points.len() as f32;
+                                    let filtering = filtering.to_ratio_f32();
+                                    Some(
+                                        points
+                                            .iter()
+                                            .map(|(id, _)| id)
+                                            .take((total * filtering) as usize)
+                                            .collect::<RoaringBitmap>(),
+                                    )
+                                }
+                            };
 
-                        // This is the real expected answer without the filtered out candidates.
-                        let answer = points
-                            .iter()
-                            .map(|(id, _)| *id)
-                            .filter(|&id| candidates.as_ref().map_or(true, |c| c.contains(id)))
-                            .take(max)
-                            .collect::<Vec<_>>();
+                            // This is the real expected answer without the filtered out candidates.
+                            let answer = points
+                                .iter()
+                                .map(|(id, _)| *id)
+                                .filter(|&id| candidates.as_ref().map_or(true, |c| c.contains(id)))
+                                .take(max)
+                                .collect::<Vec<_>>();
 
-                        (*filtering, (candidates, answer))
-                    })
-                    .collect();
+                            (*filtering, (candidates, answer))
+                        })
+                        .collect();
 
-                (id, target, filtered)
-            })
-            .collect();
+                    (id, target, filtered)
+                })
+                .collect()
+        };
 
         match contender {
             scenarios::ScenarioContender::Qdrant => match distance {
@@ -142,6 +171,7 @@ fn main() {
                             distance,
                             search,
                             queries,
+                            &recall_tested,
                             database,
                         );
                     },
@@ -158,6 +188,7 @@ fn main() {
                             distance,
                             search,
                             queries,
+                            &recall_tested,
                             database,
                         );
                     },
@@ -167,14 +198,6 @@ fn main() {
 
         println!();
     }
-
-    // for dataset in datasets {
-    //     let vectors: Vec<_> =
-    //         dataset.iter().enumerate().map(|(i, v)| (i as u32, v)).take(count).collect();
-    //     dataset.header();
-    //     bench_over_all_distances(dataset.dimensions(), vectors.as_slice());
-    //     println!();
-    // }
 }
 
 fn set_or_all<S, T>(datasets: Vec<S>) -> Vec<T>

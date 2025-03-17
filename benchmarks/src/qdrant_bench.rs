@@ -16,7 +16,7 @@ use rand::SeedableRng;
 use roaring::RoaringBitmap;
 
 use crate::scenarios::*;
-use crate::{partial_sort_by, Distance, Recall, RECALL_TESTED, RNG_SEED};
+use crate::{partial_sort_by, Distance, Recall, RNG_SEED};
 
 pub fn prepare_and_run<D, F>(points: &[(u32, &[f32])], execute: F)
 where
@@ -169,6 +169,7 @@ pub fn measure_qdrant_distance<
     dimensions: usize,
     _memory: usize,
     points: &[(u32, &[f32])],
+    recall_tested: &[usize],
 ) {
     let filtered_percentage = FILTER_SUBSET_PERCENT as f32;
     let candidates_range = if FILTER_SUBSET_PERCENT >= 100 {
@@ -232,7 +233,7 @@ pub fn measure_qdrant_distance<
 
         let mut duration_secs = 0.0;
         let mut recalls = Vec::new();
-        for number_fetched in RECALL_TESTED {
+        for &number_fetched in recall_tested {
             if number_fetched > points.len() {
                 break;
             }

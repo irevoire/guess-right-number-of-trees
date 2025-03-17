@@ -13,7 +13,7 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use roaring::RoaringBitmap;
 
 use crate::scenarios::*;
-use crate::{partial_sort_by, Recall, RECALL_TESTED, RNG_SEED};
+use crate::{partial_sort_by, Recall, RNG_SEED};
 const TWENTY_HUNDRED_MIB: usize = 2000 * 1024 * 1024 * 1024;
 
 pub fn prepare_and_run<D, F>(points: &[(u32, &[f32])], memory: usize, execute: F)
@@ -46,6 +46,7 @@ pub fn run_scenarios<D: Distance>(
     distance: &ScenarioDistance,
     search: Vec<&ScenarioSearch>,
     queries: Vec<(&u32, &&[f32], HashMap<ScenarioFiltering, (Option<RoaringBitmap>, Vec<u32>)>)>,
+    recall_tested: &[usize],
     database: arroy::Database<D>,
 ) {
     let database_size =
@@ -56,7 +57,7 @@ pub fn run_scenarios<D: Distance>(
     for ScenarioSearch { oversampling, filtering } in &search {
         let mut time_to_search = Duration::default();
         let mut recalls = Vec::new();
-        for number_fetched in RECALL_TESTED {
+        for &number_fetched in recall_tested {
             let (correctly_retrieved, duration) = queries
                 .par_iter()
                 .map(|(&id, _target, relevants)| {
@@ -125,6 +126,7 @@ pub fn measure_arroy_distance<
     dimensions: usize,
     memory: usize,
     points: &[(u32, &[f32])],
+    recall_tested: &[usize],
 ) {
     let dir = tempfile::tempdir().unwrap();
     let env =
@@ -157,7 +159,7 @@ pub fn measure_arroy_distance<
     let mut total_duration = Duration::default();
 
     let mut recalls = Vec::new();
-    for number_fetched in RECALL_TESTED {
+    for &number_fetched in recall_tested {
         if number_fetched > points.len() {
             break;
         }
