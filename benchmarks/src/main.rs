@@ -94,10 +94,10 @@ fn main() {
             previous_dataset = Some(dataset.name());
             dataset.header();
             if dataset.len() != count {
+                let c = count.min(dataset.len());
                 println!(
-                    "\x1b[1m{}\x1b[0m vectors are used for this measure and {}B of memory",
+                    "\x1b[1m{c}\x1b[0m vectors are used for this measure and {}B of memory",
                     dataset.len(),
-                    memory
                 );
             }
         }
