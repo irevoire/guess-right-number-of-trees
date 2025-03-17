@@ -246,7 +246,5 @@ fn load_into_arroy<D: arroy::Distance>(
         assert!(candidates.push(*i));
     }
     writer.builder(rng).available_memory(memory).build(wtxn).unwrap();
-    // writer.builder(rng).n_trees(1000).build(wtxn).unwrap();
-    // writer.builder(rng).build(wtxn).unwrap();
     candidates
 }
