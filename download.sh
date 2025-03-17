@@ -84,14 +84,14 @@ if [ ! -f $output ]; then
     rm -rf tmp-assets/*
 fi
 
-output=assets/hn-posts.mat
-if [ ! -f $output ]; then
-    curl -o $output 'https://static.wilsonl.in/hackerverse/dataset/post-embs-data.mat'
-fi
+# output=assets/hn-posts.mat
+# if [ ! -f $output ]; then
+#     curl -o $output 'https://static.wilsonl.in/hackerverse/dataset/post-embs-data.mat'
+# fi
 
-output=assets/hn-top-posts.mat
-if [ ! -f $output ]; then
-    curl -o $output 'https://static.wilsonl.in/hackerverse/dataset/toppost-embs-data.mat'
-fi
+# output=assets/hn-top-posts.mat
+# if [ ! -f $output ]; then
+#     curl -o $output 'https://static.wilsonl.in/hackerverse/dataset/toppost-embs-data.mat'
+# fi
 
 rm -rf tmp-assets
