@@ -47,7 +47,7 @@ impl<T: AnyBitPattern> MatLEView<T> {
     }
 
     pub fn len(&self) -> usize {
-        (self.mmap.len() / mem::size_of::<T>()) / self.dimensions
+        ((self.mmap.len() / mem::size_of::<T>()) / self.dimensions) - 1
     }
 
     pub fn get(&self, index: usize) -> Option<Result<&[T], PodCastError>> {

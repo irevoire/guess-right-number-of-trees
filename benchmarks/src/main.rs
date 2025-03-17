@@ -94,7 +94,10 @@ fn main() {
             previous_dataset = Some(dataset.name());
             dataset.header();
             if dataset.len() != count {
-                println!("\x1b[1m{count}\x1b[0m vectors are used for this measure and {}", memory);
+                println!(
+                    "\x1b[1m{count}\x1b[0m vectors are used for this measure and {}B of memory",
+                    memory
+                );
             }
         }
 
