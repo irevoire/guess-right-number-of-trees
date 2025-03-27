@@ -16,8 +16,13 @@ use crate::scenarios::*;
 use crate::{partial_sort_by, Recall, RNG_SEED};
 const TWENTY_HUNDRED_MIB: usize = 2000 * 1024 * 1024 * 1024;
 
-pub fn prepare_and_run<D, F>(points: &[(u32, &[f32])], memory: usize, verbose: bool, execute: F)
-where
+pub fn prepare_and_run<D, F>(
+    points: &[(u32, &[f32])],
+    number_of_chunks: usize,
+    memory: usize,
+    verbose: bool,
+    execute: F,
+) where
     D: Distance,
     F: FnOnce(Duration, &heed::Env, Database<D>),
 {
@@ -33,28 +38,38 @@ where
 
     let database =
         env.create_database::<internals::KeyCodec, NodeCodec<D>>(&mut wtxn, None).unwrap();
-    let _inserted =
-        load_into_arroy(&mut arroy_seed, &mut wtxn, database, dimensions, memory, points, verbose);
+    let _inserted = load_into_arroy(
+        &mut arroy_seed,
+        &mut wtxn,
+        database,
+        dimensions,
+        memory,
+        points,
+        number_of_chunks,
+        verbose,
+    );
     wtxn.commit().unwrap();
 
     (execute)(before_build.elapsed(), &env, database);
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_scenarios<D: Distance>(
     env: &heed::Env,
     time_to_index: Duration,
     distance: &ScenarioDistance,
-    search: Vec<&ScenarioSearch>,
-    queries: Vec<(&u32, &&[f32], HashMap<ScenarioFiltering, (Option<RoaringBitmap>, Vec<u32>)>)>,
+    number_of_chunks: usize,
+    search: &[&ScenarioSearch],
+    queries: &[(&u32, &&[f32], HashMap<ScenarioFiltering, (Option<RoaringBitmap>, Vec<u32>)>)],
     recall_tested: &[usize],
     database: arroy::Database<D>,
 ) {
     let database_size =
         Byte::from_u64(env.non_free_pages_size().unwrap()).get_appropriate_unit(UnitType::Binary);
 
-    println!("indexing: {time_to_index:02.2?}, size: {database_size:#.2}");
+    println!("indexing: {time_to_index:02.2?}, size: {database_size:#.2}, indexed in {number_of_chunks}x");
 
-    for ScenarioSearch { oversampling, filtering } in &search {
+    for ScenarioSearch { oversampling, filtering } in search {
         let mut time_to_search = Duration::default();
         let mut recalls = Vec::new();
         for &number_fetched in recall_tested {
@@ -126,6 +141,7 @@ pub fn measure_arroy_distance<
     dimensions: usize,
     memory: usize,
     points: &[(u32, &[f32])],
+    number_of_chunks: usize,
     recall_tested: &[usize],
     verbose: bool,
 ) {
@@ -141,8 +157,16 @@ pub fn measure_arroy_distance<
     let database = env
         .create_database::<internals::KeyCodec, NodeCodec<D::ArroyDistance>>(&mut wtxn, None)
         .unwrap();
-    let inserted =
-        load_into_arroy(&mut arroy_seed, &mut wtxn, database, dimensions, memory, points, verbose);
+    let inserted = load_into_arroy(
+        &mut arroy_seed,
+        &mut wtxn,
+        database,
+        dimensions,
+        memory,
+        points,
+        number_of_chunks,
+        verbose,
+    );
     wtxn.commit().unwrap();
 
     let filtered_percentage = FILTER_SUBSET_PERCENT as f32;
@@ -233,6 +257,7 @@ pub fn measure_arroy_distance<
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_into_arroy<D: arroy::Distance>(
     rng: &mut StdRng,
     wtxn: &mut RwTxn,
@@ -240,19 +265,23 @@ fn load_into_arroy<D: arroy::Distance>(
     dimensions: usize,
     memory: usize,
     points: &[(ItemId, &[f32])],
+    number_of_chunks: usize,
     verbose: bool,
 ) -> RoaringBitmap {
-    let writer = Writer::<D>::new(database, 0, dimensions);
     let mut candidates = RoaringBitmap::new();
-    for (i, vector) in points.iter() {
-        assert_eq!(vector.len(), dimensions);
-        writer.add_item(wtxn, *i, vector).unwrap();
-        assert!(candidates.push(*i));
+    let avg_chunk_size = points.len() / number_of_chunks;
+    for points in points.chunks(avg_chunk_size) {
+        let writer = Writer::<D>::new(database, 0, dimensions);
+        for (i, vector) in points.iter() {
+            assert_eq!(vector.len(), dimensions);
+            writer.add_item(wtxn, *i, vector).unwrap();
+            assert!(candidates.push(*i));
+        }
+        let mut builder = writer.builder(rng);
+        if verbose {
+            builder.progress(|progress| println!("    {progress:?}"));
+        }
+        builder.available_memory(memory).build(wtxn).unwrap();
     }
-    let mut builder = writer.builder(rng);
-    if verbose {
-        builder.progress(|progress| println!("    {progress:?}"));
-    }
-    builder.available_memory(memory).build(wtxn).unwrap();
     candidates
 }

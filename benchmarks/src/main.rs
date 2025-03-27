@@ -43,6 +43,12 @@ struct Args {
     #[arg(long, default_value_t = 10_000)]
     count: usize,
 
+    /// These numbers correspond to the numbers of chunks that the dataset will be split into for indexing.
+    ///
+    /// Each number corresponds to a new indexation in x chunks. Use a comma to separate multiple features.
+    #[arg(long, value_delimiter = ',', default_value = "1")]
+    number_of_chunks: Vec<usize>,
+
     /// Memory available for indexing.
     #[arg(long, default_value_t = Byte::MAX)]
     memory: Byte,
@@ -56,6 +62,7 @@ fn main() {
     let Args {
         datasets,
         count,
+        number_of_chunks,
         contenders,
         distances,
         over_samplings,
@@ -168,43 +175,53 @@ fn main() {
         };
         println!("Starting indexing process");
 
-        match contender {
-            scenarios::ScenarioContender::Qdrant => match distance {
-                scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
-                    &points,
-                    memory,
-                    verbose,
-                    |time_to_index, env, database| {
-                        arroy_bench::run_scenarios(
-                            env,
-                            time_to_index,
-                            distance,
-                            search,
-                            queries,
-                            &recall_tested,
-                            database,
-                        );
-                    },
-                ),
-            },
-            scenarios::ScenarioContender::Arroy => match distance {
-                scenarios::ScenarioDistance::Cosine => arroy_bench::prepare_and_run::<Cosine, _>(
-                    &points,
-                    memory,
-                    verbose,
-                    |time_to_index, env, database| {
-                        arroy_bench::run_scenarios(
-                            env,
-                            time_to_index,
-                            distance,
-                            search,
-                            queries,
-                            &recall_tested,
-                            database,
-                        );
-                    },
-                ),
-            },
+        for number_of_chunks in &number_of_chunks {
+            match contender {
+                scenarios::ScenarioContender::Qdrant => match distance {
+                    scenarios::ScenarioDistance::Cosine => {
+                        arroy_bench::prepare_and_run::<Cosine, _>(
+                            &points,
+                            *number_of_chunks,
+                            memory,
+                            verbose,
+                            |time_to_index, env, database| {
+                                arroy_bench::run_scenarios(
+                                    env,
+                                    time_to_index,
+                                    distance,
+                                    *number_of_chunks,
+                                    &search,
+                                    &queries,
+                                    &recall_tested,
+                                    database,
+                                );
+                            },
+                        )
+                    }
+                },
+                scenarios::ScenarioContender::Arroy => match distance {
+                    scenarios::ScenarioDistance::Cosine => {
+                        arroy_bench::prepare_and_run::<Cosine, _>(
+                            &points,
+                            *number_of_chunks,
+                            memory,
+                            verbose,
+                            |time_to_index, env, database| {
+                                arroy_bench::run_scenarios(
+                                    env,
+                                    time_to_index,
+                                    distance,
+                                    *number_of_chunks,
+                                    &search,
+                                    &queries,
+                                    &recall_tested,
+                                    database,
+                                );
+                            },
+                        )
+                    }
+                },
+            }
         }
 
         println!();
