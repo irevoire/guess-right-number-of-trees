@@ -60,6 +60,10 @@ struct Args {
     #[arg(long, default_value_t = Byte::MAX)]
     memory: Byte,
 
+    /// The number of threads to use for indexing. If not specified the maximum number of threads will be used.
+    #[arg(long)]
+    threads: Option<usize>,
+
     /// When set to true, will print all the steps it goes through.
     #[arg(long, default_value_t = false)]
     verbose: bool,
@@ -77,8 +81,13 @@ fn main() {
         sleep_between_chunks,
         memory,
         recall_tested,
+        threads,
         verbose,
     } = Args::parse();
+
+    if let Some(threads) = threads {
+        rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
+    }
 
     let datasets = set_or_all::<_, MatLEView<f32>>(datasets);
     let contenders = set_or_all::<_, scenarios::ScenarioContender>(contenders);
