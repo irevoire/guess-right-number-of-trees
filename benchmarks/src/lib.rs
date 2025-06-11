@@ -85,7 +85,6 @@ impl fmt::Debug for Recall {
     }
 }
 
-
 #[derive(Debug)]
 pub struct IndexingMetrics {
     start: Instant,
@@ -99,7 +98,15 @@ pub struct IndexingMetrics {
 
 impl IndexingMetrics {
     pub fn new() -> Self {
-        Self { start: Instant::now(), end: Instant::now(), insert_durations: Vec::new(), build_durations: Vec::new(), nb_vectors: Vec::new(), database_size: Vec::new(), nb_trees: Vec::new() }
+        Self {
+            start: Instant::now(),
+            end: Instant::now(),
+            insert_durations: Vec::new(),
+            build_durations: Vec::new(),
+            nb_vectors: Vec::new(),
+            database_size: Vec::new(),
+            nb_trees: Vec::new(),
+        }
     }
 
     pub fn start_insertion(&mut self) {
@@ -138,56 +145,106 @@ impl fmt::Display for IndexingMetrics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Total time to index: {:.2?} (", self.end.duration_since(self.start))?;
 
-        for (idx, ((insert_start, insert_end), (build_start, build_end))) in self.insert_durations.iter().zip(self.build_durations.iter()).enumerate() {
+        for (idx, ((insert_start, insert_end), (build_start, build_end))) in
+            self.insert_durations.iter().zip(self.build_durations.iter()).enumerate()
+        {
             if idx != 0 {
                 write!(f, " + ")?;
             }
-            write!(f, "{:.2?}", insert_end.duration_since(*insert_start) + build_end.duration_since(*build_start))?;
+            write!(
+                f,
+                "{:.2?}",
+                insert_end.duration_since(*insert_start) + build_end.duration_since(*build_start)
+            )?;
         }
         writeln!(f, ")")?;
 
+        // First step is to format all the lists in a vector of strings
+
+        let vectors = self.nb_vectors.iter().map(|v| format!("{}", v)).collect::<Vec<_>>();
+        let insertions = self
+            .insert_durations
+            .iter()
+            .map(|(insert_start, insert_end)| {
+                format!("{:.2?}", insert_end.duration_since(*insert_start))
+            })
+            .collect::<Vec<_>>();
+        let builds = self
+            .build_durations
+            .iter()
+            .map(|(build_start, build_end)| {
+                format!("{:.2?}", build_end.duration_since(*build_start))
+            })
+            .collect::<Vec<_>>();
+        let trees = self.nb_trees.iter().map(|v| format!("{}", v)).collect::<Vec<_>>();
+        let db_size = self
+            .database_size
+            .iter()
+            .map(|v| {
+                format!(
+                    "{:.2}",
+                    Byte::from_decimal_with_unit(Decimal::from(*v), Unit::B)
+                        .unwrap()
+                        .get_appropriate_unit(UnitType::Binary)
+                )
+            })
+            .collect::<Vec<_>>();
+
+        // Then we can retrieve the max length of each column in the list to pretty print the table later
+        let max_lengths = vectors
+            .iter()
+            .zip(insertions.iter())
+            .zip(builds.iter())
+            .zip(trees.iter())
+            .zip(db_size.iter())
+            .map(|((((v, i), b), t), d)| {
+                [v.len(), i.len(), b.len(), t.len(), d.len()].into_iter().max().unwrap()
+            })
+            .collect::<Vec<_>>();
+
         write!(f, "  => Vectors:    ")?;
-        for (idx, nb_vectors) in self.nb_vectors.iter().enumerate() {
+        for (idx, (nb_vectors, max_length)) in vectors.iter().zip(max_lengths.iter()).enumerate() {
             if idx != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", nb_vectors)?;
+            write!(f, "{nb_vectors:>max_length$}")?;
         }
         writeln!(f, "")?;
 
         write!(f, "  => Insertions: ")?;
-        for (idx, (insert_start, insert_end)) in self.insert_durations.iter().enumerate() {
+        for (idx, (insert, max_length)) in insertions.iter().zip(max_lengths.iter()).enumerate() {
             if idx != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{:.2?}", insert_end.duration_since(*insert_start))?;
+            write!(f, "{insert:>max_length$}")?;
         }
         writeln!(f, "")?;
 
         write!(f, "  => Builds:     ")?;
-        for (idx, (build_start, build_end)) in self.build_durations.iter().enumerate() {
+        for (idx, (build, max_length)) in builds.iter().zip(max_lengths.iter()).enumerate() {
             if idx != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{:.2?}", build_end.duration_since(*build_start))?;
+            write!(f, "{build:>max_length$}")?;
         }
         writeln!(f, "")?;
 
         write!(f, "  => Trees:      ")?;
-        for (idx, nb_trees) in self.nb_trees.iter().enumerate() {
+        for (idx, (nb_trees, max_length)) in trees.iter().zip(max_lengths.iter()).enumerate() {
             if idx != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", nb_trees)?;
+            write!(f, "{nb_trees:>max_length$}")?;
         }
         writeln!(f, "")?;
 
         write!(f, "  => Db size:    ")?;
-        for (idx, database_size) in self.database_size.iter().enumerate() {
+        for (idx, (database_size, max_length)) in db_size.iter().zip(max_lengths.iter()).enumerate()
+        {
             if idx != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{:.2}", Byte::from_decimal_with_unit(Decimal::from(*database_size), Unit::B).unwrap().get_appropriate_unit(UnitType::Binary))?;
+            write!(f, "{database_size:>max_length$}")?;
         }
 
         Ok(())

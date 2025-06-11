@@ -10,8 +10,8 @@ use rand::SeedableRng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use roaring::RoaringBitmap;
 
-use crate::{scenarios::*, IndexingMetrics};
 use crate::Recall;
+use crate::{scenarios::*, IndexingMetrics};
 const TWENTY_HUNDRED_MIB: usize = 2000 * 1024 * 1024 * 1024;
 
 pub fn prepare_and_run<D, F>(
