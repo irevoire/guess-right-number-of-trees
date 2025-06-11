@@ -177,28 +177,7 @@ fn main() {
 
         for number_of_chunks in &number_of_chunks {
             match contender {
-                scenarios::ScenarioContender::Qdrant => match distance {
-                    scenarios::ScenarioDistance::Cosine => {
-                        arroy_bench::prepare_and_run::<Cosine, _>(
-                            &points,
-                            *number_of_chunks,
-                            memory,
-                            verbose,
-                            |time_to_index, env, database| {
-                                arroy_bench::run_scenarios(
-                                    env,
-                                    time_to_index,
-                                    distance,
-                                    *number_of_chunks,
-                                    &search,
-                                    &queries,
-                                    &recall_tested,
-                                    database,
-                                );
-                            },
-                        )
-                    }
-                },
+                scenarios::ScenarioContender::Qdrant => println!("Qdrant is not supported yet"),
                 scenarios::ScenarioContender::Arroy => match distance {
                     scenarios::ScenarioDistance::Cosine => {
                         arroy_bench::prepare_and_run::<Cosine, _>(

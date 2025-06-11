@@ -239,7 +239,8 @@ dependencies = [
 [[package]]
 name = "arroy"
 version = "0.6.1"
-source = "git+https://github.com/meilisearch/arroy?branch=main#f96e1013c4595021bd011d98f987764bb25c6742"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08e6111f351d004bd13e95ab540721272136fd3218b39d3ec95a2ea1c4e6a0a6"
 dependencies = [
  "bytemuck",
  "byteorder",

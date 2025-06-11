@@ -18,7 +18,7 @@ use rand::SeedableRng;
 use roaring::RoaringBitmap;
 
 use crate::scenarios::*;
-use crate::{partial_sort_by, Distance, Recall, RNG_SEED};
+use crate::{Distance, Recall, RNG_SEED};
 
 pub fn run_scenarios<D: Distance>(
     _env: &heed::Env,
@@ -191,6 +191,7 @@ pub fn measure_qdrant_distance<
             for _ in 0..100 {
                 let querying = points.choose(&mut rng).unwrap();
 
+                /*
                 let relevant = partial_sort_by::<D>(
                     points
                         .iter()
@@ -211,6 +212,7 @@ pub fn measure_qdrant_distance<
                     get_vector_from_point(querying),
                     number_fetched,
                 );
+                */
 
                 let search_builder = SearchPointsBuilder::new(
                     collection_name,
@@ -236,6 +238,7 @@ pub fn measure_qdrant_distance<
                     .await
                     .unwrap();
 
+                /*
                 for point in response.result {
                     if relevant
                         .iter()
@@ -248,7 +251,7 @@ pub fn measure_qdrant_distance<
                         if !(l..=h).contains(&get_id_from_id(point.id.as_ref().unwrap())) {}
                     }
                 }
-
+                */
                 duration_secs += response.time;
             }
 
