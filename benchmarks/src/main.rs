@@ -49,6 +49,13 @@ struct Args {
     #[arg(long, value_delimiter = ',', default_value = "1")]
     number_of_chunks: Vec<usize>,
 
+    /// The time to sleep between each chunk indexing specified in seconds.
+    /// 
+    /// This is useful when profiling, it helps quickly identifying when each steps took place.
+    /// Also, it's not counted in any of the individual reported indexing time metrics but it is counted in the total indexing time.
+    #[arg(long, default_value_t = 0)]
+    sleep_between_chunks: usize,
+
     /// Memory available for indexing.
     #[arg(long, default_value_t = Byte::MAX)]
     memory: Byte,
@@ -67,6 +74,7 @@ fn main() {
         distances,
         over_samplings,
         filterings,
+        sleep_between_chunks,
         memory,
         recall_tested,
         verbose,
@@ -183,6 +191,7 @@ fn main() {
                         arroy_bench::prepare_and_run::<Cosine, _>(
                             &points,
                             *number_of_chunks,
+                            sleep_between_chunks,
                             memory,
                             verbose,
                             |time_to_index, env, database| {

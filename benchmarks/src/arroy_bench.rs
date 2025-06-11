@@ -17,6 +17,7 @@ const TWENTY_HUNDRED_MIB: usize = 2000 * 1024 * 1024 * 1024;
 pub fn prepare_and_run<D, F>(
     points: &[(u32, &[f32])],
     number_of_chunks: usize,
+    sleep_between_chunks: usize,
     memory: usize,
     verbose: bool,
     execute: F,
@@ -44,6 +45,7 @@ pub fn prepare_and_run<D, F>(
         memory,
         points,
         number_of_chunks,
+        sleep_between_chunks,
         verbose,
     );
 
@@ -140,6 +142,7 @@ fn load_into_arroy<D: arroy::Distance>(
     memory: usize,
     points: &[(ItemId, &[f32])],
     number_of_chunks: usize,
+    sleep_between_chunks: usize,
     verbose: bool,
 ) -> IndexingMetrics {
     let mut metrics = IndexingMetrics::new();
@@ -147,6 +150,9 @@ fn load_into_arroy<D: arroy::Distance>(
     let mut nb_vectors = 0;
 
     for points in points.chunks(avg_chunk_size) {
+        if sleep_between_chunks != 0 {
+            std::thread::sleep(Duration::from_secs(sleep_between_chunks as u64));
+        }
         let mut wtxn = env.write_txn().unwrap();
         metrics.start_insertion();
         let writer = Writer::<D>::new(database, 0, dimensions);
