@@ -43,6 +43,10 @@ struct Args {
     #[arg(long, default_value_t = 10_000)]
     count: usize,
 
+    /// Set the number of trees to generate to a fixed value, if not specified the number of trees will be automatically computed.
+    #[arg(long)]
+    nb_trees: Option<usize>,
+
     /// These numbers correspond to the numbers of chunks that the dataset will be split into for indexing.
     ///
     /// Each number corresponds to a new indexation in x chunks. Use a comma to separate multiple features.
@@ -73,6 +77,7 @@ fn main() {
     let Args {
         datasets,
         count,
+        nb_trees,
         number_of_chunks,
         contenders,
         distances,
@@ -199,6 +204,7 @@ fn main() {
                     scenarios::ScenarioDistance::Cosine => {
                         arroy_bench::prepare_and_run::<Cosine, _>(
                             &points,
+                            nb_trees,
                             *number_of_chunks,
                             sleep_between_chunks,
                             memory,
