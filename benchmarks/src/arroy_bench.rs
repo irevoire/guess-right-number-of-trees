@@ -1,9 +1,10 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
 use arroy::internals::{self, NodeCodec};
-use arroy::{Database, Distance, ItemId, Writer};
+use arroy::{Database, Distance, ItemId, Writer, WriterProgress};
 use byte_unit::{Byte, UnitType};
 use heed::EnvOpenOptions;
 use rand::rngs::StdRng;
@@ -152,6 +153,11 @@ fn load_into_arroy<D: arroy::Distance>(
     let mut metrics = IndexingMetrics::new();
     let avg_chunk_size = points.len() / number_of_chunks;
     let mut nb_vectors = 0;
+    let (progress_sender, progress_receiver) = std::sync::mpsc::channel();
+
+    if verbose {
+        std::thread::spawn(move || log_progress(progress_receiver));
+    }
 
     for points in points.chunks(avg_chunk_size) {
         if sleep_between_chunks != 0 {
@@ -173,13 +179,8 @@ fn load_into_arroy<D: arroy::Distance>(
         if let Some(nb_trees) = nb_trees {
             builder.n_trees(nb_trees);
         }
-        let start_building = Mutex::new(std::time::Instant::now());
         if verbose {
-            builder.progress(move |progress| {
-                let mut time = start_building.lock().unwrap();
-                tracing::info!("    {progress:?}, last step took: {:?}", time.elapsed());
-                *time = std::time::Instant::now();
-            });
+            builder.progress(|progress| progress_sender.send(progress).unwrap());
         }
         metrics.start_building();
         builder.available_memory(memory).build(&mut wtxn).unwrap();
@@ -198,4 +199,32 @@ fn load_into_arroy<D: arroy::Distance>(
 
     metrics.end();
     metrics
+}
+
+fn log_progress(recv: Receiver<WriterProgress>) {
+    let mut time = std::time::Instant::now();
+    let mut last_progress = None;
+
+    loop {
+        let progress = recv.recv_timeout(Duration::from_secs(10));
+        match progress {
+            Ok(progress) => {
+                tracing::info!("    {progress:?}, last step took: {:.2?}", time.elapsed());
+                last_progress = Some(progress);
+                time = std::time::Instant::now();
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                break;
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                if let Some(ref last_progress) = last_progress {
+                    if let Some(ref sub) = last_progress.sub {
+                        let current = sub.current.load(Ordering::Relaxed);
+                        let percentage = current as f32 / sub.max as f32 * 100.0;
+                        tracing::info!("    {last_progress:?}, has been running for: {:.2?}, {percentage:#.2}%", time.elapsed());
+                    }
+                }
+            }
+        }
+    }
 }
