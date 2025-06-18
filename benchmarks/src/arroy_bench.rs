@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use arroy::internals::{self, NodeCodec};
@@ -156,6 +157,7 @@ fn load_into_arroy<D: arroy::Distance>(
         if sleep_between_chunks != 0 {
             std::thread::sleep(Duration::from_secs(sleep_between_chunks as u64));
         }
+        tracing::info!("Inserting chunk of size {} in arroy", points.len());
         let mut wtxn = env.write_txn().unwrap();
         metrics.start_insertion();
         let writer = Writer::<D>::new(database, 0, dimensions);
@@ -165,12 +167,19 @@ fn load_into_arroy<D: arroy::Distance>(
         }
         metrics.end_insertion();
 
+        tracing::info!("Starts building the trees");
+
         let mut builder = writer.builder(rng);
         if let Some(nb_trees) = nb_trees {
             builder.n_trees(nb_trees);
         }
+        let start_building = Mutex::new(std::time::Instant::now());
         if verbose {
-            builder.progress(|progress| println!("    {progress:?}"));
+            builder.progress(move |progress| {
+                let mut time = start_building.lock().unwrap();
+                tracing::info!("    {progress:?}, last step took: {:?}", time.elapsed());
+                *time = std::time::Instant::now();
+            });
         }
         metrics.start_building();
         builder.available_memory(memory).build(&mut wtxn).unwrap();

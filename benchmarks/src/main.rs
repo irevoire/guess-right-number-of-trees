@@ -15,6 +15,7 @@ use rand::SeedableRng;
 use rayon::slice::ParallelSliceMut;
 use roaring::RoaringBitmap;
 use slice_group_by::GroupBy;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -54,7 +55,7 @@ struct Args {
     number_of_chunks: Vec<usize>,
 
     /// The time to sleep between each chunk indexing specified in seconds.
-    /// 
+    ///
     /// This is useful when profiling, it helps quickly identifying when each steps took place.
     /// Also, it's not counted in any of the individual reported indexing time metrics but it is counted in the total indexing time.
     #[arg(long, default_value_t = 0)]
@@ -89,6 +90,21 @@ fn main() {
         threads,
         verbose,
     } = Args::parse();
+
+    if verbose {
+        // Initialize tracing with the specified level
+        let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+            let filter = format!("arroy=debug,benchmarks=debug");
+            EnvFilter::new(filter)
+        });
+
+        FmtSubscriber::builder()
+            .with_env_filter(env_filter)
+            .with_target(true)
+            .with_thread_ids(true)
+            .with_thread_names(true)
+            .init();
+    }
 
     if let Some(threads) = threads {
         rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
