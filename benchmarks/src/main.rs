@@ -17,6 +17,10 @@ use roaring::RoaringBitmap;
 use slice_group_by::GroupBy;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
+fn parse_number_with_underscores(s: &str) -> Result<usize, std::num::ParseIntError> {
+    s.replace('_', "").parse()
+}
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -41,7 +45,7 @@ struct Args {
     recall_tested: String,
 
     /// Number of vectors to evaluate from the datasets.
-    #[arg(long, default_value_t = 10_000)]
+    #[arg(long, default_value_t = 10_000, value_parser = parse_number_with_underscores)]
     count: usize,
 
     /// Set the number of trees to generate to a fixed value, if not specified the number of trees will be automatically computed.
