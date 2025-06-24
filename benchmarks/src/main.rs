@@ -28,15 +28,19 @@ struct Args {
     #[arg(long, value_enum)]
     datasets: Vec<scenarios::Dataset>,
 
+    /// Ignored
     #[arg(long, value_enum)]
     contenders: Vec<scenarios::ScenarioContender>,
 
+    /// Ignored
     #[arg(long, value_enum)]
     distances: Vec<scenarios::ScenarioDistance>,
 
+    /// Ignored
     #[arg(long, value_enum)]
     over_samplings: Vec<scenarios::ScenarioOversampling>,
 
+    /// Ignored
     #[arg(long, value_enum)]
     filterings: Vec<scenarios::ScenarioFiltering>,
 
@@ -44,13 +48,13 @@ struct Args {
     #[arg(long, default_value_t = String::from("1,10,20,50,100,500"))]
     recall_tested: String,
 
-    /// Number of vectors to evaluate from the datasets.
-    #[arg(long, default_value_t = 10_000, value_parser = parse_number_with_underscores)]
-    count: usize,
+    /// Set the different number of documents to evaluate from the dataset.
+    #[arg(long, value_delimiter = ',', value_parser = parse_number_with_underscores)]
+    count: Vec<usize>,
 
-    /// Set the number of trees to generate to a fixed value, if not specified the number of trees will be automatically computed.
-    #[arg(long)]
-    nb_trees: Option<usize>,
+    /// Set different number of trees to generate to try for each number of documents
+    #[arg(long, value_delimiter = ',')]
+    nb_trees: Vec<usize>,
 
     /// These numbers correspond to the numbers of chunks that the dataset will be split into for indexing.
     ///
@@ -115,10 +119,10 @@ fn main() {
     }
 
     let datasets = set_or_all::<_, MatLEView<f32>>(datasets);
-    let contenders = set_or_all::<_, scenarios::ScenarioContender>(contenders);
-    let distances = set_or_all::<_, scenarios::ScenarioDistance>(distances);
-    let over_samplings = set_or_all::<_, scenarios::ScenarioOversampling>(over_samplings);
-    let filterings = set_or_all::<_, scenarios::ScenarioFiltering>(filterings);
+    let contenders = vec![scenarios::ScenarioContender::Arroy];
+    let distances = vec![scenarios::ScenarioDistance::Cosine];
+    let over_samplings = vec![scenarios::ScenarioOversampling::X1];
+    let filterings = vec![scenarios::ScenarioFiltering::NoFilter];
     let recall_tested: Vec<usize> = recall_tested
         .split(',')
         .enumerate()
@@ -130,6 +134,11 @@ fn main() {
         })
         .collect();
 
+    assert!(datasets.len() == 1, "Cannot use more than one dataset");
+    assert!(number_of_chunks.len() == 1, "Cannot use more than one chunk");
+    assert!(!nb_trees.is_empty(), "Must specify at least one number of trees with --nb-trees 1,2,3");
+    assert!(!count.is_empty(), "Must specify at least one number of vectors with --count 1000,2000,3000");
+
     let scenaris: Vec<_> = iproduct!(datasets, distances, contenders, over_samplings, filterings)
         .map(|(dataset, distance, contender, oversampling, filtering)| {
             (dataset, distance, contender, ScenarioSearch { oversampling, filtering })
@@ -137,113 +146,115 @@ fn main() {
         .sorted()
         .collect();
 
-    let mut previous_dataset = None;
+    let mut header = String::new();
+    header.push_str(&format!("nb vectors,nb trees,db size in bytes,recall score,"));
+    recall_tested.iter().for_each(|recall| write!(&mut header, "recall@{recall},").unwrap());
+    let header = header.trim_end_matches(",");
+    println!("{header}");
+
     for grp in scenaris
         .linear_group_by(|(da, dia, ca, _), (db, dib, cb, _)| da == db && dia == dib && ca == cb)
     {
-        let (dataset, distance, contender, _) = &grp[0];
-        let search: Vec<&ScenarioSearch> = grp.iter().map(|(_, _, _, s)| s).collect();
+        for count in &count {
+            for nb_trees in &nb_trees {
+                // need to be filled up for the end log
+                let mut line = String::new();
+                line.push_str(&format!("{count},{nb_trees},"));
 
-        if previous_dataset != Some(dataset.name()) {
-            previous_dataset = Some(dataset.name());
-            dataset.header();
-            if dataset.len() != count {
-                let c = count.min(dataset.len());
-                println!(
-                    "\x1b[1m{c}\x1b[0m vectors are used for this measure and {memory}B of memory",
-                );
-            }
-        }
+                let (dataset, distance, contender, _) = &grp[0];
+                let search: Vec<&ScenarioSearch> = grp.iter().map(|(_, _, _, s)| s).collect();
 
-        let points: Vec<_> =
-            dataset.iter().take(count).enumerate().map(|(i, v)| (i as u32, v)).collect();
-        let memory = memory.as_u64() as usize;
+                let points: Vec<_> =
+                    dataset.iter().take(*count).enumerate().map(|(i, v)| (i as u32, v)).collect();
+                let memory = memory.as_u64() as usize;
 
-        let mut recall_tested_s = String::new();
-        recall_tested
-            .iter()
-            .for_each(|recall| write!(&mut recall_tested_s, "{recall:4}, ").unwrap());
-        let recall_tested_s = recall_tested_s.trim_end_matches(", ");
-        println!("Recall tested is:   [{recall_tested_s}]");
+                let max = recall_tested.iter().max().copied().unwrap_or_default();
+                // If we have no recall we can skip entirely the generation of the queries
+                let queries = if max == 0 {
+                    Vec::new()
+                } else {
+                    let mut rng = StdRng::seed_from_u64(RNG_SEED);
+                    (0..100)
+                        .map(|_| points.choose(&mut rng).unwrap())
+                        .map(|(id, target)| {
+                            let mut points = points.clone();
+                            points.par_sort_unstable_by_key(|(_, v)| {
+                                OrderedFloat(benchmarks::distance::<Cosine>(target, v))
+                            });
 
-        let max = recall_tested.iter().max().copied().unwrap_or_default();
-        // If we have no recall we can skip entirely the generation of the queries
-        let queries = if max == 0 {
-            Vec::new()
-        } else {
-            let mut rng = StdRng::seed_from_u64(RNG_SEED);
-            (0..100)
-                .map(|_| points.choose(&mut rng).unwrap())
-                .map(|(id, target)| {
-                    let mut points = points.clone();
-                    points.par_sort_unstable_by_key(|(_, v)| {
-                        OrderedFloat(benchmarks::distance::<Cosine>(target, v))
-                    });
-
-                    // We collect the different filtered versions here.
-                    let filtered: HashMap<_, _> = search
-                        .iter()
-                        .map(|ScenarioSearch { filtering, .. }| {
-                            let candidates = match filtering {
-                                scenarios::ScenarioFiltering::NoFilter => None,
-                                filtering => {
-                                    let total = points.len() as f32;
-                                    let filtering = filtering.to_ratio_f32();
-                                    Some(
-                                        points
-                                            .iter()
-                                            .map(|(id, _)| id)
-                                            .take((total * filtering) as usize)
-                                            .collect::<RoaringBitmap>(),
-                                    )
-                                }
-                            };
-
-                            // This is the real expected answer without the filtered out candidates.
-                            let answer = points
+                            // We collect the different filtered versions here.
+                            let filtered: HashMap<_, _> = search
                                 .iter()
-                                .map(|(id, _)| *id)
-                                .filter(|&id| candidates.as_ref().map_or(true, |c| c.contains(id)))
-                                .take(max)
-                                .collect::<Vec<_>>();
+                                .map(|ScenarioSearch { filtering, .. }| {
+                                    let candidates = match filtering {
+                                        scenarios::ScenarioFiltering::NoFilter => None,
+                                        filtering => {
+                                            let total = points.len() as f32;
+                                            let filtering = filtering.to_ratio_f32();
+                                            Some(
+                                                points
+                                                    .iter()
+                                                    .map(|(id, _)| id)
+                                                    .take((total * filtering) as usize)
+                                                    .collect::<RoaringBitmap>(),
+                                            )
+                                        }
+                                    };
 
-                            (*filtering, (candidates, answer))
+                                    // This is the real expected answer without the filtered out candidates.
+                                    let answer = points
+                                        .iter()
+                                        .map(|(id, _)| *id)
+                                        .filter(|&id| {
+                                            candidates.as_ref().map_or(true, |c| c.contains(id))
+                                        })
+                                        .take(max)
+                                        .collect::<Vec<_>>();
+
+                                    (*filtering, (candidates, answer))
+                                })
+                                .collect();
+
+                            (id, target, filtered)
                         })
-                        .collect();
+                        .collect()
+                };
 
-                    (id, target, filtered)
-                })
-                .collect()
-        };
-        println!("Starting indexing process");
-
-        for number_of_chunks in &number_of_chunks {
-            match contender {
-                scenarios::ScenarioContender::Qdrant => println!("Qdrant is not supported yet"),
-                scenarios::ScenarioContender::Arroy => match distance {
-                    scenarios::ScenarioDistance::Cosine => {
-                        arroy_bench::prepare_and_run::<Cosine, _>(
-                            &points,
-                            nb_trees,
-                            *number_of_chunks,
-                            sleep_between_chunks,
-                            memory,
-                            verbose,
-                            |time_to_index, env, database| {
-                                arroy_bench::run_scenarios(
-                                    env,
-                                    time_to_index,
-                                    distance,
+                for number_of_chunks in &number_of_chunks {
+                    match contender {
+                        scenarios::ScenarioContender::Qdrant => {
+                            println!("Qdrant is not supported yet")
+                        }
+                        scenarios::ScenarioContender::Arroy => match distance {
+                            scenarios::ScenarioDistance::Cosine => {
+                                arroy_bench::prepare_and_run::<Cosine, _>(
+                                    &mut line,
+                                    &points,
+                                    Some(*nb_trees),
                                     *number_of_chunks,
-                                    &search,
-                                    &queries,
-                                    &recall_tested,
-                                    database,
-                                );
-                            },
-                        )
+                                    sleep_between_chunks,
+                                    memory,
+                                    verbose,
+                                    |line,time_to_index, env, database| {
+                                        arroy_bench::run_scenarios(
+                                            line,
+                                            env,
+                                            time_to_index,
+                                            distance,
+                                            *number_of_chunks,
+                                            &search,
+                                            &queries,
+                                            &recall_tested,
+                                            database,
+                                        );
+                                    },
+                                )
+                            }
+                        },
                     }
-                },
+                }
+                let line =line.trim_end_matches(",");
+                println!("{line}");
             }
         }
 

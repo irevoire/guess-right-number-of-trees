@@ -17,6 +17,7 @@ use crate::{scenarios::*, IndexingMetrics};
 const TWENTY_HUNDRED_MIB: usize = 2000 * 1024 * 1024 * 1024;
 
 pub fn prepare_and_run<D, F>(
+    line: &mut String,
     points: &[(u32, &[f32])],
     nb_trees: Option<usize>,
     number_of_chunks: usize,
@@ -26,7 +27,7 @@ pub fn prepare_and_run<D, F>(
     execute: F,
 ) where
     D: Distance,
-    F: FnOnce(&IndexingMetrics, &heed::Env, Database<D>),
+    F: FnOnce(&mut String, &IndexingMetrics, &heed::Env, Database<D>),
 {
     let dimensions = points[0].1.len();
 
@@ -41,6 +42,7 @@ pub fn prepare_and_run<D, F>(
     wtxn.commit().unwrap();
 
     let duration = load_into_arroy(
+        line,
         &mut arroy_seed,
         &env,
         database,
@@ -53,11 +55,12 @@ pub fn prepare_and_run<D, F>(
         verbose,
     );
 
-    (execute)(&duration, &env, database);
+    (execute)(line, &duration, &env, database);
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn run_scenarios<D: Distance>(
+    line: &mut String,
     env: &heed::Env,
     time_to_index: &IndexingMetrics,
     distance: &ScenarioDistance,
@@ -67,15 +70,10 @@ pub fn run_scenarios<D: Distance>(
     recall_tested: &[usize],
     database: arroy::Database<D>,
 ) {
-    let database_size =
-        Byte::from_u64(env.non_free_pages_size().unwrap()).get_appropriate_unit(UnitType::Binary);
-
-    println!("Database size: {database_size:#.2}, indexed in {number_of_chunks} chunks");
-    println!("{time_to_index}");
+    let mut recalls = Vec::new();
 
     for ScenarioSearch { oversampling, filtering } in search {
         let mut time_to_search = Duration::default();
-        let mut recalls = Vec::new();
         for &number_fetched in recall_tested {
             let (correctly_retrieved, duration) = queries
                 .par_iter()
@@ -127,18 +125,18 @@ pub fn run_scenarios<D: Distance>(
                 correctly_retrieved.map_or(-1.0, |cr| cr as f32 / (number_fetched as f32 * 100.0));
             recalls.push(Recall(recall));
         }
+    }
 
-        let filtered_percentage = filtering.to_ratio_f32() * 100.0;
-        println!(
-            "[arroy]  {distance:16?} {oversampling}: {recalls:?}, \
-                                    searched for: {time_to_search:02.2?}, \
-                                    searched in {filtered_percentage:#.2}%"
-        );
+    let recall_score = recalls.iter().map(|r| r.0).sum::<f32>() / recalls.len() as f32;
+    line.push_str(&format!("{recall_score:#.2},"));
+    for recall in &recalls {
+        line.push_str(&format!("{:#.2},", recall.0));
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn load_into_arroy<D: arroy::Distance>(
+    line: &mut String,
     rng: &mut StdRng,
     env: &heed::Env,
     database: Database<D>,
@@ -195,6 +193,7 @@ fn load_into_arroy<D: arroy::Distance>(
         nb_vectors += points.len();
         metrics.new_nb_vectors(nb_vectors);
         metrics.new_database_size(env.non_free_pages_size().unwrap() as usize);
+        line.push_str(&format!("{},", env.non_free_pages_size().unwrap()));
     }
 
     metrics.end();
