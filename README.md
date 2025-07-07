@@ -26,11 +26,16 @@ I handcrafted a new curve with the shape I wanted to follow:
 
 I repeated the process with 1536 and 3072 dimensions.
 
-Finally ,@nnethercott found a formula following closely this curve:
+Finally, [@nnethercott](https://github.com/nnethercott) found a formula following closely this curve:
 ![image](https://github.com/user-attachments/assets/7ad22e7f-68c2-45dc-8907-513445f04b4c)
 
 That's the final version of the formula:
 `= IF(A2 < 10000, 2 ^ (LOG($A2, 2) - 6), 2 ^ (LOG(A2, 10) + (768 / $C$3)^4))`
 
 You can see the data we used for this analysis here: https://docs.google.com/spreadsheets/d/19Y1zgDokzLiw_q5iBfgII1E33XiryRyYUJJtfgRVoqE/edit?usp=sharing
+
 These changes have been merged into arroy here: https://github.com/meilisearch/arroy/pull/138
+
+-----
+
+No Frozen Beans Were Harmed :tm: in the process
